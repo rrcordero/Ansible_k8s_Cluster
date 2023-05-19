@@ -1,0 +1,18 @@
+---
+# file: kubernetes_servers.yml
+- hosts: kubernetes_servers
+  roles:
+    - provisioning
+    - network
+    - common
+    - paths
+    - nvidia
+    - firewall
+    - cloudflare
+    - etcd
+    - pulse_load_balanced_node
+    - kubernetes
+    - zabbix
+    - upgrade_bash
+  max_fail_percentage: 99
+  serial: 5

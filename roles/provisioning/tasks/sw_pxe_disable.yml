@@ -1,0 +1,12 @@
+---
+- name: Remove temporary file with ports and switches mapping
+  file: path=/tmp/switch_to_server_port.yml state=absent
+  delegate_to: 127.0.0.1
+  run_once: true
+
+- name: Remove PXE vlan on switches
+  shell: ansible-playbook site.yml -i cross_environment/switches.yml --limit={{ switches }}
+  args:
+    chdir: /etc/ansible-sc/
+  delegate_to: 127.0.0.1
+  run_once: true

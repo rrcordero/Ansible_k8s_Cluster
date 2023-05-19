@@ -1,0 +1,10 @@
+---
+{% for host in play_hosts %}
+{% if hostvars[host].switch_to_server_ip is defined %}
+{% if loop.first %}
+switch_to_server_port:
+{% endif %}
+  - switch_ip: {{ hostvars[host].switch_to_server_ip }}
+    server_port: {{ (provisioning_force_nic1 == true) | ternary(hostvars[host].switch_to_server_wan_port, hostvars[host].switch_to_server_lan_port) }}
+{% endif %}
+{% endfor %}

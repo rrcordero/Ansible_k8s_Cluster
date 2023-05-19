@@ -1,0 +1,27 @@
+<?php
+$MAC = isset($_GET['MAC']) ? $_GET['MAC'] : null;
+$IP = isset($_GET['ip']) ? $_GET['ip'] : null;
+
+if($MAC){
+	$MAC = str_replace(":", "-", $MAC);
+	$MAC = strtoupper($MAC);
+	$folder = "./{{ provisioning_ipxe_install_server_control_folder }}/";
+	$file = "$folder$MAC";
+	$ks = $IP.'.cfg';
+	$repo = "{{ provisioning_pxe_server }}";
+	if(!is_dir("$folder")){
+		mkdir("$folder", 0777);
+	}
+	
+	if(!file_exists($file)){
+		print "#!ipxe\n";
+		print "kernel --name img images/centos/7/x86_64/vmlinuz net.ifnames=0 biosdevname=0 inst.cmdline modprobe.blacklist=usb_storage,uas initrd=images/centos/7/x86_64/initrd.img inst.ks=http://$repo/$ks ifname=eth100:\${net0/mac} bond=bond0:eth100:mode=802.3ad,miimon=100,lacp_rate=fast ip=\${net0/ip}::\${net0/gateway}:\${net0/netmask}:bootme:bond0:none nameserver=\${net0/dns} inst.waitfornet=120\n";
+		print "initrd images/centos/7/x86_64/initrd.img\n";
+		print "boot img\n";
+		file_put_contents($file, '1');
+	}else{
+		print "#!ipxe\n";
+		print "chain http://$repo/grub4dos/grub.exe --config-file=\"chainloader (hd0)+1;rootnoverify (hd0);chainloader (hd1)+1;rootnoverify (hd1)\"\n";
+		print "boot\n";
+	}
+}

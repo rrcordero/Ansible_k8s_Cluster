@@ -1,0 +1,33 @@
+<?php
+$MAC = isset($_GET['MAC']) ? $_GET['MAC'] : null;
+$IP = isset($_GET['ip']) ? $_GET['ip'] : null;
+
+if($MAC){
+	$MAC = str_replace(":", "-", $MAC);
+	$MAC = strtoupper($MAC);
+	$folder = "./{{ provisioning_ipxe_install_server_control_folder }}/";
+	$file = "$folder$MAC";
+	$ks = $IP.'.cfg';
+	$repo = "{{ provisioning_pxe_server }}";
+	if(!is_dir("$folder")){
+		mkdir("$folder", 0777);
+	}
+	
+	if(!file_exists($file)){
+		/*
+			TODO: Does not work on Centos 6
+		*/
+		print "#!ipxe\n";		
+		print "kernel --name img images/centos/6/x86_64/vmlinuz network ksdevice=bootif BOOTIF=01-\${net0/mac} ip=\${net0/ip} gateway=\${net0/gateway} netmask=\${net0/netmask} dns=\${net0/dns} noipv6 nicdelay=30 acpi=off cmdline blacklist=usb_storage,uas ks=http://$repo/$ks\n";
+		print "initrd images/centos/6/x86_64/initrd.img\n";
+		print "boot img\n";
+		file_put_contents($file, '1');
+	}else{
+		/*
+			TODO: Does not boot on Centos 6
+		*/
+		print "#!ipxe\n";
+		print "chain http://$repo/grub4dos/grub.exe --config-file=\"chainloader (hd0)+1;rootnoverify (hd0);chainloader (hd1)+1;rootnoverify (hd1)\"\n";
+		print "boot\n";
+	}
+}

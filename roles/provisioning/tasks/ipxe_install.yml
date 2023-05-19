@@ -1,0 +1,50 @@
+---
+- name: Install ipmitool
+  yum: name=ipmitool-{{ provisioning_ipmitool_version }} state=present
+  delegate_to: 127.0.0.1
+  run_once: true
+
+- name: Create kickstart config
+  template: >
+    src={{ provisioning_distro_name }}-{{ provisioning_distro_version }}-{{ provisioning_distro_cpu_model }}.j2 
+    dest={{ provisioning_pxe_server_root_folder }}/{{ inventory_hostname }}.cfg
+    mode=0755
+  delegate_to: "{{ provisioning_pxe_server }}"
+
+- name: Remove install server control file
+  file: path={{ provisioning_pxe_server_root_folder }}/{{ provisioning_ipxe_install_server_control_folder }}/{{ nic1_mac_address | upper }} state=absent
+  delegate_to: "{{ provisioning_pxe_server }}"
+
+- name: Ensure boot script is present
+  template: >
+    src=boot.php.j2
+    dest={{ provisioning_pxe_server_root_folder }}/boot.php
+    mode=0755
+  delegate_to: "{{ provisioning_pxe_server }}"
+
+- name: Register server power status
+  shell: ipmitool -I lanplus -H {{ out_of_band_management_ip }} -p {{ out_of_band_management_port }} -U {{ out_of_band_management_user }} -P {{ out_of_band_management_password }} power status
+  changed_when: false
+  register: power_status
+  delegate_to: 127.0.0.1
+
+- name: Reset server
+  shell: ipmitool -I lanplus -H {{ out_of_band_management_ip }} -p {{ out_of_band_management_port }} -U {{ out_of_band_management_user }} -P {{ out_of_band_management_password }} power reset
+  delegate_to: 127.0.0.1
+  when: power_status.stdout.find('on') != -1
+  register: power_reset
+  
+- name: Power on server
+  shell: ipmitool -I lanplus -H {{ out_of_band_management_ip }} -p {{ out_of_band_management_port }} -U {{ out_of_band_management_user }} -P {{ out_of_band_management_password }} power on
+  delegate_to: 127.0.0.1
+  when: power_status.stdout.find('off') != -1
+  register: power_on
+  
+- name: Wait_for_server (1h)
+  wait_for: host={{ hostvars[inventory_hostname].ansible_host | default(inventory_hostname) }} port={{ hostvars[inventory_hostname].ansible_port | default(22) }} state=started delay=240 timeout=3600
+  delegate_to: 127.0.0.1
+  
+#Avoid errors on decommissioned servers
+- name: Remove kickstart config
+  file: name=dest={{ provisioning_pxe_server_root_folder }}/{{ inventory_hostname }}.cfg state=absent
+  delegate_to: "{{ provisioning_pxe_server }}"

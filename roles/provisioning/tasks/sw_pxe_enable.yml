@@ -1,0 +1,14 @@
+---
+#TODO: better playbook/roles integration
+- name: Create temporary file with ports and switches mapping
+  template: src=switch_to_server_port.yml.j2 dest=/tmp/switch_to_server_port.yml
+  delegate_to: 127.0.0.1
+  run_once: true
+
+#--limit does not care about duplicated hosts
+- name: Configure PXE vlan on switches
+  shell: ansible-playbook site.yml -i cross_environment/switches.yml --limit={{ switches | trim }}
+  args:
+    chdir: /etc/ansible-sc/
+  delegate_to: 127.0.0.1
+  run_once: true

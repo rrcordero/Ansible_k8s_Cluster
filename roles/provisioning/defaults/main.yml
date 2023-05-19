@@ -1,0 +1,47 @@
+---
+provisioning_type: "pxe_linux"
+provisioning_pxe_server: IP_PUBLICA_PXE_SERVER
+provisioning_pxe_dhcp_server: 192.168.1.1
+provisioning_pxe_server_root_folder: /var/www/html
+provisioning_pxe_server_pxelinux_folder: /tftpboot/pxelinux.cfg
+provisioning_ipmitool_version: 1.8.18
+provisioning_ipxe_install_server_control_folder: installed
+provisioning_net_install_url: "http://mirror.mojohost.com/centos/6/os/x86_64"
+provisioning_net_install_eth: eth0
+provisioning_dhcp_boot_eth: ""
+
+provisioning_root_passalgo: sha512
+provisioning_root_default_password: ""
+
+provisioning_distro_name: centos
+provisioning_distro_version: 7
+provisioning_distro_cpu_model: x86_64
+
+provisioning_boot_gpt: false
+provisioning_storage_layout: "RAID10"
+provisioning_storage_volgroup_pe_size: 4096
+provisioning_volgroup00_size: '81920 --grow'
+provisioning_total_volgroup_size: '200 --grow'
+
+provisioning_host_verification_timeout: 30
+
+provisioning_reinstall: false
+
+provisioning_nokill: false
+provisioning_loglevel: info
+
+provisioning_configure_swap: true
+
+provisioning_swap_size: 4096
+provisioning_force_nic1: false
+
+provisioning_vgname: VolGroup00
+
+provisioning_bios_update: false
+provisioning_bios_version: 3B25
+
+# Default values for ipmi/drac/management access
+# out_of_band_management_ip is mandatory. All else has default values.
+out_of_band_management_port: 623
+out_of_band_management_user: root
+out_of_band_management_password: root

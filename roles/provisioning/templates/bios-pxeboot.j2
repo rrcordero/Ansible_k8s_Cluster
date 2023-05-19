@@ -1,0 +1,10 @@
+DEFAULT menu.c32
+MENU TITLE Bios update
+PROMPT 0
+TIMEOUT 1
+ONTIMEOUT bios
+
+LABEL bios
+MENU LABEL Bios version {{ provisioning_bios_version }} update for C1100
+  kernel images/bios/{{ provisioning_bios_version }}/memdisk
+  append initrd=images/bios/{{ provisioning_bios_version }}/bios_update_{{ provisioning_bios_version }}.img

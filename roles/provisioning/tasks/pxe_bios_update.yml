@@ -1,0 +1,51 @@
+---
+- block:
+    - name: Install ipmitool
+      yum: name=ipmitool-{{ provisioning_ipmitool_version }} state=present
+      delegate_to: 127.0.0.1
+      run_once: true
+    
+    - name: ensure pxelinux directory is created
+      file: path={{ provisioning_pxe_server_pxelinux_folder }} state=directory
+      delegate_to: "{{ provisioning_pxe_server }}"
+      run_once: true
+
+    - name: Create pxe boot config
+      template: src=bios-pxeboot.j2 dest={{ provisioning_pxe_server_pxelinux_folder }}/01-{{ (provisioning_force_nic1 == true) | ternary(nic1_mac_address, nic2_mac_address) | lower | replace(":","-") }} mode=0755
+      delegate_to: "{{ provisioning_pxe_server }}"
+    
+    - name: Register server power status
+      shell: ipmitool -I lanplus -H {{ out_of_band_management_ip }} -p {{ out_of_band_management_port }} -U {{ out_of_band_management_user }} -P {{ out_of_band_management_password }} power status
+      changed_when: false
+      register: power_status
+      delegate_to: 127.0.0.1
+    
+    - name: Reset server
+      shell: ipmitool -I lanplus -H {{ out_of_band_management_ip }} -p {{ out_of_band_management_port }} -U {{ out_of_band_management_user }} -P {{ out_of_band_management_password }} power reset
+      delegate_to: 127.0.0.1
+      when: power_status.stdout.find('on') != -1
+      register: power_reset
+      
+    - name: Power on server
+      shell: ipmitool -I lanplus -H {{ out_of_band_management_ip }} -p {{ out_of_band_management_port }} -U {{ out_of_band_management_user }} -P {{ out_of_band_management_password }} power on
+      delegate_to: 127.0.0.1
+      when: power_status.stdout.find('off') != -1
+      register: power_on
+    
+    - name: Pause 30s before changing boot order
+      pause: seconds=30
+      when: (power_reset is defined and power_reset.changed) or (power_on is defined and power_on.changed)
+
+    # TODO:
+    # Probar en c2100: "ipmitool -I lanplus -H <IPMI_host/IP add> -U <username> chassis bootparam set bootflag force_pxe"
+    - name: Force PXE on next boot only (one more time to be sure)
+      shell: ipmitool -I lanplus -H {{ out_of_band_management_ip }} -p {{ out_of_band_management_port }} -U {{ out_of_band_management_user }} -P {{ out_of_band_management_password }} chassis bootdev pxe
+      delegate_to: 127.0.0.1
+      
+    - name: Pause 6min before remove pxe boot config
+      pause: seconds=360
+
+  always:
+    - name: Remove pxe boot config (avoid errors on decommissioned servers)
+      file: name={{ provisioning_pxe_server_pxelinux_folder }}/01-{{ (provisioning_force_nic1 == true) | ternary(nic1_mac_address, nic2_mac_address) | lower | replace(":","-") }} state=absent
+      delegate_to: "{{ provisioning_pxe_server }}"

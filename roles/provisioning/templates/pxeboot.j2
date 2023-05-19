@@ -1,0 +1,12 @@
+DEFAULT menu.c32
+MENU TITLE PXE Boot
+PROMPT 0
+TIMEOUT 1
+#TOTALTIMEOUT 6000
+ONTIMEOUT {{ inventory_hostname }}-deploy
+
+LABEL {{ inventory_hostname}}-deploy
+MENU LABEL {{ provisioning_distro_name }} {{ provisioning_distro_version }} {{ provisioning_distro_cpu_model }} for {{ inventory_hostname }}
+kernel images/{{ provisioning_distro_name }}/{{ provisioning_distro_version }}/{{ provisioning_distro_cpu_model }}/vmlinuz
+ipappend 2
+append initrd=images/{{ provisioning_distro_name }}/{{ provisioning_distro_version }}/{{ provisioning_distro_cpu_model }}/initrd.img net.ifnames=0 biosdevname=0 inst.cmdline ip={{ provisioning_dhcp_boot_eth }}:dhcp inst.ks=http://{{ provisioning_pxe_dhcp_server }}/{{ provisioning_distro_name }}-{{ provisioning_distro_version }}-{{ provisioning_distro_cpu_model }}-{{ inventory_hostname }}.cfg {% if provisioning_nokill|bool == true  %}inst.nokill{% endif %} inst.loglevel={{ provisioning_loglevel }}  modprobe.blacklist=usb_storage,uas

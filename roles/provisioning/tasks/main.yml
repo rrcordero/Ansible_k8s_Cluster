@@ -1,0 +1,80 @@
+---
+
+- name: Check for duplicate management ip addresses in hostvars (step 1)
+  shell: >
+    grep -Er "^out_of_band_management_ip:.?{{ out_of_band_management_ip }}$" | wc -l
+  delegate_to: 127.0.0.1
+  register: provisioning_duplicate_check
+  changed_when: false
+  when:
+    - out_of_band_management_ip is defined
+    - out_of_band_management_ip != ""
+
+- name: Check for duplicate management ip addresses in hostvars (step 2)
+  fail:
+    msg: |
+      ERROR:
+      There are {{ provisioning_duplicate_check }} host_vars files with management ip address {{ out_of_band_management_ip }}.
+      This should not happen, and provisioning will not continue until it's fixed.
+      Find the involved host_vars files with "grep -r {{ out_of_band_management_ip }} host_vars".
+  changed_when: false
+  when:
+    - out_of_band_management_ip is defined
+    - provisioning_duplicate_check is defined
+    - provisioning_duplicate_check | int > 1
+
+- block:
+  - fail:
+      msg: "Set default root password first."
+    when:
+    - provisioning_root_default_password == "12345678"
+
+  - name: Verify if server is already installed
+    wait_for: host={{ hostvars[inventory_hostname].ansible_host | default(inventory_hostname) }} port={{ hostvars[inventory_hostname].ansible_port | default(22) }} state=started timeout={{ provisioning_host_verification_timeout }}
+    ignore_errors: true
+    register: is_installed
+    delegate_to: 127.0.0.1
+    when: provisioning_reinstall | bool == false
+
+    #TODO: better group mapping using add_host module
+  - name: Create group of switches that need PXE vlan configured
+    set_fact:
+      switches: "{%- for host in play_hosts -%} {%- if hostvars[host].switch_to_server_ip is defined -%}\n  {%- if loop.last -%}\n    {{ hostvars[host].switch_to_server_ip + '' }}\n  {%- else -%}\n    {{ hostvars[host].switch_to_server_ip + ',' }}\n  {%- endif -%}\n{%- endif -%} {%- endfor -%}\n"
+    delegate_to: 127.0.0.1
+    run_once: true
+
+  - include_tasks: sw_pxe_enable.yml
+    when:
+    - (provisioning_reinstall | bool == true or (is_installed is defined and is_installed.elapsed >= provisioning_host_verification_timeout) or provisioning_bios_update | bool == true) and switches != '\n'
+
+  - include_tasks: pxe_linux_install.yml
+    when:
+    - (provisioning_reinstall | bool == true or (is_installed is defined and is_installed.elapsed >= provisioning_host_verification_timeout)) and provisioning_type | lower == 'pxe_linux'
+
+  - include_tasks: pxe_bios_update.yml
+    when:
+    - provisioning_bios_update | bool == true and provisioning_type | lower == 'pxe_linux'
+
+  - include_tasks: ipxe_install.yml
+    when:
+    - (provisioning_reinstall | bool == true or (is_installed is defined and is_installed.elapsed >= provisioning_host_verification_timeout)) and provisioning_type | lower == 'ipxe'
+
+  always:
+  - include_tasks: sw_pxe_disable.yml
+    when:
+    - (provisioning_reinstall | bool == true or (is_installed is defined and is_installed.elapsed >= provisioning_host_verification_timeout) or provisioning_bios_update | bool == true) and switches != '\n'
+
+  - name: Wait_for_server (6 min)
+    wait_for: host={{ hostvars[inventory_hostname].ansible_host | default(inventory_hostname) }} port={{ hostvars[inventory_hostname].ansible_port | default(22) }} state=started delay=180
+    delegate_to: 127.0.0.1
+    when:
+    - provisioning_bios_update | bool == true
+
+  - name: Set BMC interface to dedicated
+    shell: ipmi-oem Quanta set-nic-mode dedicated
+    when:
+    - provisioning_bios_update | bool == true
+
+  tags:
+  - provisioning
+
