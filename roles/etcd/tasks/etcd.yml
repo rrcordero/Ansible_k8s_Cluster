@@ -1,0 +1,122 @@
+---
+
+- name: Pre check cluster health
+  shell: etcdctl cluster-health
+  delegate_to: "{{ item }}" 
+  register: prehealth
+  with_items:
+  - "{{ groups[etcd_cluster_group_name] | difference(inventory_hostname) | first }}"
+  environment:
+    ETCDCTL_API: 2
+  changed_when: false
+  failed_when: false
+  tags:
+  - etcd
+
+- include_tasks: remove.yml
+  when: 
+  - "'cluster is degraded' in prehealth.results[0].stdout_lines"
+  tags:
+  - etcd
+
+- name: Ensure etcd package is absent
+  yum: 
+    name: etcd 
+    state: absent
+  tags:
+  - etcd
+
+- name: Create required directories
+  file: 
+    path: "{{ item }}" 
+    state: directory
+  with_items:
+  - "{{ etcd_config_dir }}"
+  - "{{ etcd_releases_dir }}"
+  tags:
+  - etcd
+
+- name: Download etcd release
+  get_url:
+    url: "{{ etcd_local_repo }}/etcd-v{{ etcd_version }}-linux-amd64.tar.gz"
+    dest: "{{ etcd_releases_dir }}/etcd-v{{ etcd_version }}-linux-amd64.tar.gz"
+  tags:
+  - etcd
+
+- name: Extract etcd binaries
+  unarchive:
+    src: "{{ etcd_releases_dir }}/etcd-v{{ etcd_version }}-linux-amd64.tar.gz"
+    dest: "{{ etcd_releases_dir }}/"
+    remote_src: yes
+    creates: "{{ etcd_releases_dir }}/etcd-v{{ etcd_version }}-linux-amd64/etcd"
+  tags:
+  - etcd
+
+- name: Copy etcd binaries
+  copy:
+    src: "{{ etcd_releases_dir }}/etcd-v{{ etcd_version }}-linux-amd64/{{ item }}"
+    dest: "{{ etcd_bin_dir }}/{{ item }}"
+    remote_src: true
+    force: yes
+    mode: 0755
+  with_items:
+  - etcd
+  - etcdctl
+  notify: restart etcd
+  tags:
+  - etcd
+
+- name: Create etcd user
+  user: 
+    name: "{{ etcd_user }}" 
+    home: "{{ etcd_data_dir }}" 
+    createhome: yes 
+    shell: /sbin/nologin
+  tags:
+  - etcd
+
+- name: Create systemd script
+  template: 
+    src: etcd.service.j2 
+    dest: /usr/lib/systemd/system/etcd.service
+  notify: restart etcd
+  tags:
+  - etcd
+
+- name: Gather facts from etcd cluster members
+  action: setup
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  with_items: "{{ groups[etcd_cluster_group_name] }}"
+  when: etcd_cluster | bool == true
+  tags:
+  - etcd
+
+- name: Configure etcd
+  template: 
+    src: etcd.conf.j2 
+    dest: "{{ etcd_config_dir }}/etcd.conf"
+  notify: restart etcd
+  tags:
+  - etcd
+
+- name: Re-add member if was unhealthy
+  shell: "etcdctl member add {{ hostvars[inventory_hostname]['etcd_name'] }} --peer-urls=http://{{ hostvars[inventory_hostname]['ansible_' + etcd_bind_interface]['ipv4'].address }}:2380"
+  delegate_to: "{{ item }}"
+  with_items:
+  - "{{ groups[etcd_cluster_group_name] | difference(inventory_hostname) | first }}"
+  when:
+  - "'cluster is degraded' in prehealth.results[0].stdout_lines"
+  notify: restart etcd
+  tags:
+  - etcd
+
+- name: Ensure etcd is started and enabled on boot
+  systemd: 
+    name: etcd 
+    state: started 
+    enabled: true
+    daemon_reload: true
+  tags:
+  - etcd
+

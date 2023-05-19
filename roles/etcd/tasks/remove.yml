@@ -1,0 +1,28 @@
+---
+
+- name: Find unhealthy member ID
+  shell: "etcdctl cluster-health | grep unreachable | cut -d ' ' -f2"
+  delegate_to: "{{ item }}"
+  register: memberid
+  with_items:
+  - "{{ groups[etcd_cluster_group_name] | difference(inventory_hostname) | first }}"
+  environment:
+    ETCDCTL_API: 2
+  changed_when: false
+  tags:
+  - etcd
+
+- name: Remove unhealthy member
+  shell: "etcdctl member remove {{ memberid.results[0].stdout }}"
+  delegate_to: "{{ item }}"
+  with_items:
+  - "{{ groups[etcd_cluster_group_name] | difference(inventory_hostname) | first }}"
+  tags:
+  - etcd
+
+- name: Use etcd initial cluster state as existing
+  set_fact:
+    etcd_initial_cluster_state: existing
+  tags:
+  - etcd
+

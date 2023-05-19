@@ -1,0 +1,36 @@
+---
+# handlers file for roles/etcd
+- name: restart etcd
+  systemd: 
+    name: etcd 
+    state: restarted 
+    daemon_reload: true
+  notify:
+    - verify cluster reachability
+    - verify cluster members
+    - verify cluster health
+
+- name: verify cluster reachability
+  uri:
+    url: "http://localhost:{{ etcd_client_port }}/health"
+  register: result
+  until: result.status == 200
+  retries: 20
+  delay: 5
+
+- name: verify cluster members
+  shell: etcdctl member list
+  register: members
+  failed_when: members.stdout_lines | count != groups[etcd_cluster_group_name] | length
+  changed_when: false
+  when: etcd_cluster | bool == true
+
+- name: verify cluster health
+  shell: etcdctl cluster-health
+  register: health
+  failed_when: "'cluster is healthy' not in health.stdout_lines"
+  changed_when: false
+  when: etcd_cluster | bool == true
+  environment:
+    ETCDCTL_API: 2
+

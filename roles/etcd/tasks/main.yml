@@ -1,0 +1,7 @@
+---
+  
+- include_tasks: etcd.yml
+  when: etcd_enabled | bool == true
+  tags:
+  - etcd
+

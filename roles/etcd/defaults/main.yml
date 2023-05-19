@@ -1,0 +1,26 @@
+---
+# defaults file for roles/etcd
+etcd_enabled: true
+etcd_local_repo: "http://mia1-bin.seeconds.com"
+etcd_version: 2.3.7
+etcd_name: default
+etcd_peer_port: 2380
+etcd_client_port: 2379
+etcd_cluster: false
+etcd_bind_interface: eth0
+etcd_bind_ip: "{{ hostvars[inventory_hostname]['ansible_' + etcd_bind_interface]['ipv4'].address }}"
+etcd_initial_cluster_token: etcd-cluster
+etcd_cluster_group_name: etcd_cluster
+etcd_initial_cluster_state: new
+etcd_enable_v2: true
+
+etcd_data_dir: /var/lib/etcd
+etcd_config_dir: /etc/etcd
+etcd_releases_dir: /opt/tmp
+etcd_bin_dir: /usr/bin
+etcd_user: etcd
+
+# ETCD timings for etcd.conf
+# https://coreos.com/etcd/docs/latest/v2/tuning.html
+etcd_heartbeat_interval: 100
+etcd_election_timeout: 1000
