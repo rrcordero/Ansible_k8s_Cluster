@@ -1,0 +1,23 @@
+
+DEVICE={{ item.1.device }}
+{% if item.0.devicetype | default('bridge') | lower == 'ovs' %}
+TYPE=OVSPort
+DEVICETYPE=ovs
+OVS_BRIDGE={{ item.0.device }}
+{% else %}
+TYPE=Ethernet
+BRIDGE={{ item.0.device }}
+{% endif %}
+BOOTPROTO=none
+{% if item.1.onboot is defined %}
+ONBOOT={{ item.1.onboot }}
+{% endif %}
+{% if item.1.vlan is defined %}
+VLAN={{ item.1.vlan }}
+{% endif %}
+{% if item.mtu is defined %}
+MTU={{ item.mtu }}
+{% endif %}
+{% if ansible_os_family | lower == 'redhat' and ansible_distribution_major_version is version('7', '>=') %}
+NM_CONTROLLED=no
+{% endif %}

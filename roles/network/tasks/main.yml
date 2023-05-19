@@ -1,0 +1,402 @@
+---
+
+- name: Add the OS specific varibles
+  include_vars: "{{ ansible_os_family }}.yml"
+  include_vars: "group_vars/all.yml"
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+
+- name: Install the required  packages in Redhat derivatives
+  yum: name=iputils state=installed
+  when: ansible_os_family == 'RedHat'
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+# Should not reload because iptables could not be present on first run
+- name: Use default sysctl nf bridges config
+  sysctl: name="{{ item }}" state=absent reload=no
+  with_items:
+  - net.bridge.bridge-nf-call-ip6tables
+  - net.bridge.bridge-nf-call-iptables
+  - net.bridge.bridge-nf-call-arptables
+  when: network_bridge_interfaces | length == 0
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Increase ARP table cache size
+  sysctl: name="{{ item.key }}" value="{{ item.value }}" state=present reload=yes
+  with_items:
+  - key: net.ipv4.neigh.default.gc_thresh1
+    value: 512
+  - key: net.ipv4.neigh.default.gc_thresh2
+    value: 2048
+  - key: net.ipv4.neigh.default.gc_thresh3
+    value: 4096
+  when: network_increase_arp_table_size | bool == true
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+
+- name: disable ipv6 from sysctl
+  sysctl: name="{{ item }}" value=1 state=present reload=yes
+  with_items:
+  - net.ipv6.conf.default.disable_ipv6
+  - net.ipv6.conf.all.disable_ipv6
+  when: ansible_os_family == 'RedHat'
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: configure traffic forwarding
+  sysctl: name="net.ipv4.ip_forward" value={{ network_ip_forward }} state=present reload=yes
+  when: ansible_os_family == 'RedHat'
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- include_tasks: dnsmasq.yml
+  when: dns_dnsmasq | lower == 'enabled'
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+
+- include_tasks: dnsmasq_disabled.yml
+  when: dns_dnsmasq | lower == 'disabled'
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+
+- include_tasks: install_NetworkManager.yml
+  when: network_networkmanager | lower == 'enabled' and network_team_interfaces | length == 0
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+# TODO: remove when NetworkManager works well with teamd
+- include_tasks: erase_NetworkManager.yml
+  when: network_networkmanager | lower == 'disabled' or network_team_interfaces | length > 0
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+# https://bugs.centos.org/view.php?id=12350
+- name: Register present devices
+  command: find {{ net_path }}/ -type f -name "ifcfg-*" -not -name "*lo"
+  register: present_devices
+  when: ansible_os_family == 'RedHat'
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+# https://bugs.centos.org/view.php?id=12350
+# Use attributes parameter in ansible 2.3
+- name: Remove i attribute
+  shell: chattr -i {{ item }}
+  with_items: "{{ present_devices.stdout_lines }}"
+  failed_when: false
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- include_tasks: network_ether_interfaces.yml
+  when: network_ether_interfaces | length > 0
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- include_tasks: network_bond_interfaces.yml
+  when: network_bond_interfaces | length > 0
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- include_tasks: network_team_interfaces.yml
+  when: network_team_interfaces | length > 0
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- include_tasks: network_bridge_interfaces.yml
+  when: network_bridge_interfaces | length > 0
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- include_tasks: network_custom_routing_policies.yml
+  when:
+  - custom_networking_ip_route_tables is defined
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal 
+
+- name: Register configured_devices
+  command: find {{ net_path }}/ -type f -name "ifcfg-*" -not -name "*lo"
+  register: configured_devices
+  when: ansible_os_family == 'RedHat'
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Register configured_devices_absent
+  command: echo "{{ item }}"
+  with_items: "{{ configured_devices.stdout_lines }}"
+  when:
+  - item not in (network_bridge_interfaces_configured | default([]))
+  - item not in (network_ether_interfaces_configured | default([]))
+  - item not in (network_bridge_interfaces_ports_configured | default([]))
+  - item not in (network_bond_interfaces_configured | default([]))
+  - item not in (network_bond_slaves_configured | default([]))
+  - item not in (network_team_interfaces_configured | default([]))
+  - item not in (network_team_slaves_configured | default([]))
+  register: configured_devices_absent
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Remove absent interfaces config files
+  file: path={{ item.item }} state=absent
+  with_items: "{{ configured_devices_absent.results }}"
+  when: configured_devices_absent.results is defined and item.changed
+  notify: restart network
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Register configured_routes
+  command: find {{ net_path }}/ -type f -name "route-*" -not -name "*lo"
+  register: configured_routes
+  when: ansible_os_family == 'RedHat'
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Remove absent routes
+  file: path={{ item }} state=absent
+  with_items: "{{ configured_routes.stdout_lines }}"
+  when:
+  - item not in (network_ether_interfaces_routes_configured | default([]))
+  - item not in (network_bridge_interfaces_routes_configured | default([]))
+  - item not in (network_bond_interfaces_routes_configured | default([]))
+  - item not in (network_team_interfaces_routes_configured | default([]))
+  notify: restart network
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Register configured_rules
+  command: find {{ net_path }}/ -type f -name "rule-*" -not -name "*lo"
+  register: configured_rules
+  when: ansible_os_family == 'RedHat'
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Remove absent rules
+  file: path={{ item }} state=absent
+  with_items: "{{ configured_rules.stdout_lines }}"
+  when:
+  - item not in (network_ether_interfaces_rules_configured | default([]))
+  notify: restart network
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+# rc.local should work when handlers readds VIP address
+- name: ensure rc.local service is enabled
+  service: name=rc-local enabled=yes
+  when: "common_rc_local_service | lower == 'enabled'"
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+
+- name: ensure rc.local is a symlink
+  file: src=rc.d/rc.local dest=/etc/rc.local state=link force=yes mode=755
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: ensure /etc/rc.d/rc.local is executable
+  file: path=/etc/rc.d/rc.local state=file mode=755
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+
+# https://bugs.centos.org/view.php?id=12350
+- name: Register present devices
+  command: find {{ net_path }}/ -type f -name "ifcfg-*" -not -name "*lo"
+  register: present_devices2
+  when: ansible_os_family == 'RedHat'
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+# https://bugs.centos.org/view.php?id=12350
+# Use attributes parameter in ansible 2.3
+- name: Add i attribute
+  shell: chattr +i {{ item }}
+  with_items: "{{ present_devices2.stdout_lines }}"
+  failed_when: false
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+# Same bug as below but without team interfaces (failsafe check)
+- fail:
+    msg: "Dell Mezzanine 10GB interfaces should have MAC address explicitly declared."
+  when:
+  - "'nic_dell_10gb_1' in group_names"
+  - item.hwaddr is not defined
+  with_items: "{{ network_ether_interfaces }}"
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+# Same bug as below but without team interfaces (does not need static mapping)
+- name: Remove any MAC address mapping
+  file: path=/etc/udev/rules.d/60-net.rules state=absent
+  when:
+  - "'nic_dell_10gb_1' in group_names"
+  - network_ether_interfaces | length > 0
+  notify: reboot
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+# https://bugs.centos.org/view.php?id=7591
+# Fix interface naming problem with ixgbe + igb drivers
+# Dell C2100 + 10GB Mezzanine card, needs MAC on each eth and renamed ifaces 10# apart
+# Using HWADDR on eth config file throws error "Device ethX has a different MAC address than expected"
+- name: Create static MAC address mapping
+  template: src=60-net.rules.j2 dest=/etc/udev/rules.d/60-net.rules
+  when:
+  - network_team_interfaces | length > 0
+  - "'nic_dell_10gb_1' in group_names"
+  notify: reboot
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+# Any other cases
+- name: Remove any MAC address mapping
+  file: path=/etc/udev/rules.d/60-net.rules state=absent
+  when:
+  - "'nic_dell_10gb_1' not in group_names"
+  notify: reboot
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- meta: flush_handlers
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Configure DNS resolvers
+  template: src=resolv.j2 dest=/etc/resolv.conf
+  when:
+  - dns_resolvers is defined
+  - dns_resolvers != 'none'
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+
+- name: Verify DNS configuration
+  shell: ping www.google.com -c 4 -s 56
+  register: result
+  until: result.stdout.find("64 bytes from") != -1
+  retries: 10
+  delay: 10
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+

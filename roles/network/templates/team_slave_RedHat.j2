@@ -1,0 +1,5 @@
+DEVICE="{{ item.1.device }}"
+DEVICETYPE="TeamPort"
+ONBOOT="{{ item.1.onboot|default('yes') }}"
+BOOTPROTO="none"
+TEAM_MASTER="{{ item.0.device }}"

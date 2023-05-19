@@ -1,0 +1,35 @@
+---
+
+- name: erase nscd
+  yum: name=nscd state=absent
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+# Also removes NetworkManager
+- name: erase dnsmasq
+  yum: name=dnsmasq state=absent
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: remove dnsmasq config
+  file: path=/etc/dnsmasq.conf state=absent
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: remove dnsmasq resolvers
+  file: path=/etc/resolv.dnsmasq state=absent
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+

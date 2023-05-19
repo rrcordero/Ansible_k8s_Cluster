@@ -1,0 +1,11 @@
+---
+
+- name: Ensure NetworkManager is absent
+  yum: name=NetworkManager* state=absent
+  notify: reboot
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+

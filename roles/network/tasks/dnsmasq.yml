@@ -1,0 +1,57 @@
+---
+
+- name: erase nscd
+  yum: name=nscd state=absent
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: install dnsmasq
+  yum: name=dnsmasq state=present
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: configure dnsmasq
+  template: src=dnsmasq.conf.j2 dest=/etc/dnsmasq.conf
+  notify: restart dnsmasq
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: configure dnsmasq resolvers
+  template: src=resolv.dnsmasq.j2 dest=/etc/resolv.dnsmasq
+  notify: restart dnsmasq
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: remove RPM backup files
+  file: path=/etc/dnsmasq.conf.{{ item }} state=absent
+  with_items:
+  - rpmnew
+  - rpmsave
+  - rpmorig
+  notify: restart dnsmasq
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: start dnsmasq service
+  service: name=dnsmasq state=started enabled=yes
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+

@@ -1,0 +1,11 @@
+{% if dns_dnsmasq | lower == 'enabled' %}
+nameserver 127.0.0.1
+{% else %}
+{% for ns in dns_resolvers %}
+nameserver {{ ns }}
+{% endfor %}
+options timeout:1
+{% if dns_domain is defined %}
+domain {{ dns_domain }}
+{% endif %}
+{% endif %}

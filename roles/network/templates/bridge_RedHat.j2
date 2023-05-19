@@ -1,0 +1,41 @@
+
+{% if item.bootproto == 'static' %}
+DEVICE={{ item.device }}
+{% if item.devicetype | default('bridge') | lower == 'ovs' %}
+TYPE=OVSBridge
+DEVICETYPE=ovs
+{% else %}
+TYPE=Bridge
+{% endif %}
+BOOTPROTO=none
+{% if item.stp is defined %}
+STP={{ item.stp }}
+{% endif %}
+{% if item.address is defined %}
+IPADDR={{ item.address }}
+{% endif %}
+{% if item.onboot is defined %}
+ONBOOT={{ item.onboot }}
+{% endif %}
+{% if item.netmask is defined %}
+NETMASK={{ item.netmask }}
+{% endif %}
+{% if item.gateway is defined %}
+GATEWAY={{ item.gateway }}
+{% endif %}
+{% endif %}
+{% if item.bootproto == 'dhcp' %}
+DEVICE={{ item.device }}
+TYPE=Bridge
+BOOTPROTO=dhcp
+{% if item.stp is defined %}
+STP={{ item.stp }}
+{% endif %}
+{% endif %}
+{% if item.address is defined and item.address | ipaddr('private') and firewall_firewalld | lower == 'enabled' %}
+ZONE="trusted"
+{% endif %}
+{% if ansible_os_family | lower == 'redhat' and ansible_distribution_major_version is version('7', '>=') %}
+NM_CONTROLLED=no
+DELAY=0
+{% endif %}

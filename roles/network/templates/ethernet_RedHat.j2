@@ -1,0 +1,49 @@
+
+{% if item.bootproto == 'static' %}
+DEVICE={{ item.device }}
+BOOTPROTO=none
+{% if item.address is defined %}
+IPADDR={{ item.address }}
+{% endif %}
+{% if item.onboot is defined %}
+ONBOOT={{ item.onboot }}
+{% if item.onboot | lower == 'no' %}
+NN_CONTROLLED=no
+{% endif %}
+{% endif %}
+{% if item.netmask is defined %}
+NETMASK={{ item.netmask }}
+{% endif %}
+{% if item.gateway is defined %}
+GATEWAY={{ item.gateway }}
+{% endif %}
+{% if item.bridge is defined %}
+BRIDGE={{ item.bridge }}
+{% endif %}
+{% if item.vlan is defined %}
+VLAN={{ item.vlan }}
+{% endif %}
+{% if item.mtu is defined %}
+MTU={{ item.mtu }}
+{% endif %}
+{% endif %}
+{% if item.bootproto == 'dhcp' %}
+DEVICE={{ item.device }}
+BOOTPROTO=dhcp
+{% if item.onboot is defined %}
+ONBOOT={{ item.onboot }}
+{% endif %}
+{% if item.mtu is defined %}
+MTU={{ item.mtu }}
+{% endif %}
+{% endif %}
+{% if item.zone is defined %}
+ZONE="{{ item.zone }}"
+{% else %}
+{% if item.address is defined and item.address | ipaddr('private') and firewall_firewalld | lower == 'enabled' %}
+ZONE="trusted"
+{% endif %}
+{% endif %}
+{% if item.hwaddr is defined %}
+HWADDR={{ item.hwaddr | lower | replace('-',':') }}
+{% endif %}

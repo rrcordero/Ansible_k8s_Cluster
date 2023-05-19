@@ -1,0 +1,61 @@
+---
+
+- name: Check if dispacther is installed
+  yum:
+    name: NetworkManager-dispatcher-routing-rules
+    state: present
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+ 
+- name: Check if NetworkManager-dispatcher service is enabled and started
+  service:
+    name: NetworkManager-dispatcher
+    enabled: yes
+    state: started
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Add new route tables
+  lineinfile:
+    path: /etc/iproute2/rt_tables
+    line: "{{ item.table_number }} {{ item.table_name }}"
+    state: present
+  with_items:
+  - "{{ custom_networking_ip_route_tables }}"
+  when:
+  - custom_networking_ip_route_tables is defined
+  notify: restart network
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Write configuration files for rhel policy routing rules configuration
+  template: src=rule_{{ ansible_os_family }}.j2 dest={{ net_path }}/rule-{{ item.device }}
+  with_items: "{{ network_ether_interfaces }}"
+  when:
+  - network_ether_interfaces is defined
+  - item.rule is defined
+  notify: restart network
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Register network_ether_interfaces_rules_configured
+  set_fact:
+    network_ether_interfaces_rules_configured: "[{% for item in network_ether_interfaces | default([]) -%}\n {% if item.rule is defined %}\n  u\"{{ net_path }}/rule-{{ item.device }}\"\n  {{ ',' }}\n {% endif %}\n {% if loop.last %}\n  {{ '' }}\n {% endif %}\n{%- endfor %}]\n"
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal 

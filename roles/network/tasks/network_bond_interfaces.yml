@@ -1,0 +1,75 @@
+---
+
+- name: Create the network configuration file for bond devices
+  template: src=bond_{{ ansible_os_family }}.j2 dest={{ net_path }}/ifcfg-{{ item.device }}
+  with_items: "{{ network_bond_interfaces }}"
+  when: network_bond_interfaces is defined
+  notify: restart network
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Register network_bond_interfaces_configured
+  set_fact:
+    network_bond_interfaces_configured: "[{% for item in network_bond_interfaces | default([]) -%}\n  u\"{{ net_path }}/ifcfg-{{ item.device }}\"\n  {{ '' if loop.last else ',' }}\n{%- endfor %}]\n"
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Make sure the bonding module is loaded
+  modprobe: name=bonding state=present
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Write configuration files for route configuration
+  template: src=route_{{ ansible_os_family }}.j2 dest={{ net_path }}/route-{{ item.device }}
+  with_items: "{{ network_bond_interfaces }}"
+  when: network_bond_interfaces is defined and item.route is defined
+  notify: restart network
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Register network_bond_interfaces_routes_configured
+  set_fact:
+    network_bond_interfaces_routes_configured: "[{% for item in network_bond_interfaces | default([]) -%}\n  {% if item.route is defined %}\n    \"{{ net_path }}/route-{{ item.device }}\"\n    {{ ',' }}\n  {% endif %}\n  {% if loop.last %}\n    {{ '' }}\n  {% endif %}\n{%- endfor %}]\n"
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Create the network configuration file for slave in the bond devices
+  template: src=bond_slave_{{ ansible_os_family }}.j2 dest={{ net_path }}/ifcfg-{{ item.1.device }}
+  with_subelements:
+  - "{{ network_bond_interfaces | default([]) }}"
+  - bond_slaves
+  when: network_bond_interfaces is defined
+  notify: restart network
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Register network_bond_slaves_configured
+  set_fact:
+    network_bond_slaves_configured: "[{% for item in network_bond_interfaces | default([]) -%}\n  {% if item.bond_slaves is defined %}\n  {% for slave in item.bond_slaves -%}\n    u\"{{ net_path }}/ifcfg-{{ slave.device }}\"\n    {{ ',' }}\n  {%- endfor %}\n  {% endif %}\n  {% if loop.last %}\n    {{ '' }}\n  {% endif %}\n{%- endfor %}]\n"
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+

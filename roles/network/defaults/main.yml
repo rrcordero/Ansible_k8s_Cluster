@@ -1,0 +1,9 @@
+---
+network_ether_interfaces: []
+network_bridge_interfaces: []
+network_bond_interfaces: []
+network_team_interfaces: []
+network_networkmanager: 'enabled'
+dns_dnsmasq: 'enabled'
+network_ip_forward: 0
+network_increase_arp_table_size: false

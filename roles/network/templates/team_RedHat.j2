@@ -1,0 +1,27 @@
+DEVICE="{{ item.device }}"
+DEVICETYPE="Team"
+ONBOOT="{{ item.onboot|default('yes') }}"
+{% if item.bootproto | default('none') | lower == 'dhcp' %}
+BOOTPROTO="dhcp"
+{% else %}
+BOOTPROTO="none"
+{% if item.address is defined %}
+IPADDR={{ item.address }}
+NETMASK={{ item.netmask }}
+{% endif %}
+{% if item.gateway is defined %}
+GATEWAY={{ item.gateway }}
+{% endif %}
+{% endif %}
+{% if item.vlan is defined %}
+VLAN={{ item.vlan }}
+{% else %}
+{% if item.runner | default('loadbalance') | lower == 'lacp' %}
+TEAM_CONFIG='{"runner": {"name": "lacp","active": true,"fast_rate": true,"tx_balancer": {"name": "basic"},"tx_hash": {{ item.tx_hash | default('["eth", "ipv4", "ipv6"]') }} },"link_watch": {"name": "ethtool"}}'
+{% else %}
+TEAM_CONFIG='{"runner": {"name": "loadbalance","tx_hash": {{ item.tx_hash | default('["eth", "ipv4", "ipv6"]') }} }}'
+{% endif %}
+{% endif %}
+{% if item.address is defined and item.address | ipaddr('private') and firewall_firewalld | lower == 'enabled' %}
+ZONE="trusted"
+{% endif %}

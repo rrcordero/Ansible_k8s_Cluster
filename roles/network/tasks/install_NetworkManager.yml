@@ -1,0 +1,27 @@
+---
+
+- name: Ensure NetworkManager is installed
+  yum: name=NetworkManager state=installed
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Configure NetworkManager
+  template: src=NetworkManager.conf.j2 dest=/etc/NetworkManager/NetworkManager.conf
+  notify: restart NetworkManager
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Ensure NetworkManager is started and enabled
+  service: name=NetworkManager state=started enabled=yes
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+

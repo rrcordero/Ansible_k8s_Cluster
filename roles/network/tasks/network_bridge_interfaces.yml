@@ -1,0 +1,142 @@
+---
+
+- name: Install the required  packages in Redhat derivatives
+  yum: name=bridge-utils state=installed
+  when: ansible_os_family == 'RedHat'
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Disable nf from bridges
+  sysctl: name="{{ item }}" value=0 state=present reload=no
+  with_items:
+  - net.bridge.bridge-nf-call-ip6tables
+  - net.bridge.bridge-nf-call-iptables
+  - net.bridge.bridge-nf-call-arptables
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Verify configured bridges
+  command: brctl show
+  register: configured_bridges
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Create the network configuration file for bridge devices
+  template: src=bridge_{{ ansible_os_family }}.j2 dest={{ net_path }}/ifcfg-{{ item.device }}
+  with_items: "{{ network_bridge_interfaces }}"
+  when: network_bridge_interfaces is defined
+  register: bridge_results
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Register network_bridge_interfaces_configured
+  set_fact:
+    network_bridge_interfaces_configured: "[{% for item in network_bridge_interfaces | default([]) -%}\n  u\"{{ net_path }}/ifcfg-{{ item.device }}\"\n  {{ '' if loop.last else ',' }}\n{%- endfor %}]\n"
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Write configuration files for rhel route configuration
+  template: src=route_{{ ansible_os_family }}.j2 dest={{ net_path }}/route-{{ item.device }}
+  with_items: "{{ network_bridge_interfaces }}"
+  when:
+  - network_bridge_interfaces is defined
+  - item.route is defined
+  notify: restart network
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Register network_bridge_interfaces_routes_configured
+  set_fact:
+    network_bridge_interfaces_routes_configured: "[{% for item in network_bridge_interfaces | default([]) -%}\n    {% if item.route is defined %}\n    {{ ',' }}\n  \"{{ net_path }}/route-{{ item.device }}\"\n  {% endif %}\n  {% if loop.last %}\n    {{ '' }}\n  {% endif %}\n{%- endfor %}]\n"
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Add bridges
+  shell: ifdown {{ item.item.device }}; ifup {{ item.item.device }}
+  with_items: "{{ bridge_results.results }}"
+  when: bridge_results is defined and item.changed and (configured_bridges.stdout_lines | length > 1)
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Configure bridges from scratch
+  shell: echo "{{ item }}"
+  notify: restart network
+  with_items: "{{ bridge_results.results }}"
+  when: bridge_results is defined and item.changed and (configured_bridges.stdout_lines | length == 1)
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Create the network configuration file for port on the bridge devices
+  template: src=bridge_port_{{ ansible_os_family }}.j2 dest={{ net_path }}/ifcfg-{{ item.1.device }}
+  with_subelements:
+  - "{{ network_bridge_interfaces | default([]) }}"
+  - ports
+  when: network_bridge_interfaces is defined
+  register: bridge_port_results
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Register network bridge ports configured
+  set_fact:
+    network_bridge_interfaces_ports_configured: "[{% for item in network_bridge_interfaces | default([]) -%}\n  {% if item.ports is defined %}\n  {% for port in item.ports -%}\n    u\"{{ net_path }}/ifcfg-{{ port.device }}\"\n    {{ ',' }}\n  {%- endfor %}\n  {% endif %}\n  {% if loop.last %}\n    {{ '' }}\n  {% endif %}\n{%- endfor %}]\n"
+  changed_when: false
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Add ports to bridge
+  shell: ifdown {{ item.item.1.device }}; ifup {{ item.item.1.device }}
+  with_items: "{{ bridge_port_results.results }}"
+  when: bridge_port_results is defined and item.changed and (configured_bridges.stdout_lines | length > 1)
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+
+- name: Configure bridge ports from scratch
+  shell: echo "{{ item }}"
+  notify: restart network
+  with_items: "{{ bridge_port_results.results }}"
+  when: bridge_port_results is defined and item.changed and (configured_bridges.stdout_lines | length == 1)
+  tags:
+  - arp
+  - network
+  - dns
+  - rclocal
+

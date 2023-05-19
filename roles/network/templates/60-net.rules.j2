@@ -1,0 +1,5 @@
+{% for team in network_team_interfaces %}
+{% for slave in team.team_slaves %}
+SUBSYSTEM=="net",ACTION=="add",DRIVERS=="?*",ATTR{address}=="{{ slave.hwaddr | lower | replace('-',':') }}",NAME="{{ slave.device }}"
+{% endfor %}
+{% endfor %}
