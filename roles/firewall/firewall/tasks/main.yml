@@ -1,0 +1,21 @@
+---
+
+- include_tasks: iptables.yml
+  when: "firewall_iptables | lower == 'enabled'"
+  tags:
+  - firewall
+
+- include_tasks: firewalld.yml
+  when: "firewall_firewalld | lower == 'enabled'"
+  tags:
+  - firewall
+
+- include_tasks: firewalld_disabled.yml
+  when: "firewall_firewalld | lower == 'disabled'"
+  tags:
+  - firewall
+
+- meta: flush_handlers
+  tags:
+  - firewall
+

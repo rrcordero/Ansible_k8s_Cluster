@@ -1,0 +1,38 @@
+---
+
+- name: temporal backup for iptables current config
+  shell: "/sbin/iptables-save > /tmp/ansible-iptables-backup"
+  tags:
+    - firewall
+
+- name: deploying iptables configs
+  block:
+    - name: ensure iptables is installed
+      yum: name=iptables state=present
+
+    - name: disable ip6tables service
+      service: name=ip6tables state=stopped enabled=no
+
+    - name: configure iptables firewall rules
+      template: src=iptables.j2 dest=/etc/sysconfig/iptables
+      notify: restart iptables
+
+    - name: Start the iptables service
+      service: name=iptables state=started enabled=yes
+
+  rescue:
+    - name: reverting iptables configs after an error during deploy
+      shell: "/sbin/iptables-restore < /tmp/ansible-iptables-backup"
+
+    - name: failing given that there was an error
+      debug:
+        msg: "There was an error while running this task: \"{{ ansible_failed_task.name }}\". Impossible to continue."
+
+#  always:
+#    - name: cleaning up iptables temporal backup
+#      file:
+#        name: "/tmp/ansible-iptables-backup"
+#        state: absent
+
+  tags:
+    - firewall

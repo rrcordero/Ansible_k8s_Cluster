@@ -1,0 +1,62 @@
+---
+
+- name: ensure firewalld is installed
+  yum: name=firewalld state=present
+  tags:
+  - firewall
+
+# https://serverfault.com/questions/819143/cant-keep-interfaces-in-assigned-zones-centos7
+- name: find interfaces in trusted zone
+  find:
+    paths: "{{ net_path }}/"
+    contains: 'ZONE="trusted"'
+  register: firewall_trusted_interfaces
+  tags:
+  - firewall
+
+- name: configure firewall rules
+  template: src={{ item }}.xml.j2 dest=/etc/firewalld/zones/{{ item }}.xml
+  with_items:
+  - public
+  - trusted
+  notify: restart firewalld
+  tags:
+  - firewall
+
+- name: configure firewall direct rules
+  template: src=direct.xml.j2 dest=/etc/firewalld/direct.xml
+  when: firewalld_direct_rules is defined
+  notify: restart firewalld
+  tags:
+  - firewall
+
+#Restart network to configure interface zone in case firewalld is stopped by default
+- name: Start the firewalld service
+  service: name=firewalld state=started enabled=yes
+  notify: restart network
+  tags:
+  - firewall
+
+- name: Register firewalld version
+  shell: rpm -qa | grep firewalld | cut -d'-' -f2
+  register: firewalld_installed_version
+  changed_when: false
+  tags:
+  - firewall
+
+- name: Register denied logging level
+  shell: firewall-cmd --get-log-denied
+  register: firewall_denied_current_logging_level
+  when: firewalld_installed_version.stdout | version_compare('0.4', '>=')
+  changed_when: false
+  tags:
+  - firewall
+
+- name: Configure denied logging level (disabled by default)
+  shell: firewall-cmd --set-log-denied={{ firewall_denied_logging_level }}
+  when:
+  - firewalld_installed_version.stdout | version_compare('0.4', '>=')
+  - firewall_denied_current_logging_level.stdout | lower != firewall_denied_logging_level | lower
+  tags:
+  - firewall
+

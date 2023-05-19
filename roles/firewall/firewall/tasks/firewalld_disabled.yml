@@ -1,0 +1,7 @@
+---
+
+- name: ensure firewalld is absent
+  yum: name=firewalld state=absent
+  tags:
+  - firewall
+
