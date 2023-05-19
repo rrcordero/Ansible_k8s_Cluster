@@ -1,0 +1,15 @@
+---
+
+- name: be sure tuned is absent
+  yum: name=tuned state=absent
+  notify: reboot
+  tags:
+  - cpupower
+  - tuned
+  - common
+
+- include_tasks: cpupower.yml
+  tags:
+  - cpupower
+  - tuned
+  - common

@@ -1,0 +1,44 @@
+---
+
+- name: increase max fd
+  sysctl: name="fs.file-max" value="{{ common_limits_nofile }}" state=present reload=yes
+  tags:
+  - extra
+  - fd
+  - limits
+  - common
+
+# https://bugzilla.redhat.com/show_bug.cgi?id=919793
+- name: remove nproc PAM limit
+  template: src=90-nproc.conf.j2 dest=/etc/security/limits.d/90-nproc.conf
+  notify: reboot
+  tags:
+  - extra
+  - limits
+  - common
+
+# TODO: erase all files not configured from this folder
+- name: remove default nproc file
+  file: path=/etc/security/limits.d/20-nproc.conf state=absent
+  notify: reboot
+  tags:
+  - extra
+  - limits
+  - common
+
+- name: persist new security limits (nproc and nofile)
+  template: src=limits.conf.j2 dest=/etc/security/limits.conf
+  notify: reboot
+  tags:
+  - extra
+  - limits
+  - common
+
+- name: remove systemd limits
+  template: src=system.conf.j2 dest=/etc/systemd/system.conf
+  notify: reboot
+  when: systemctl|lower == 'enabled'
+  tags:
+  - extra
+  - limits
+  - common

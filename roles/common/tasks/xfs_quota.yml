@@ -1,0 +1,14 @@
+---
+
+- name: Activate xfs quota on grub
+  lineinfile:
+    dest: "/etc/default/grub"
+    backup: true
+    backrefs: true
+    state: present
+    regexp: '(^GRUB_CMDLINE_LINUX=\".*(?<!rootflags=uquota,gquota))\"$'
+    line: '\1 rootflags=uquota,gquota"'
+  notify: update grub2 config
+  tags:
+  - quotas
+  - common

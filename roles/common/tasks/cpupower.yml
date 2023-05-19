@@ -1,0 +1,60 @@
+---
+
+- name: be sure cpupowerutils is installed
+  yum:
+    name: cpupowerutils
+    state: present
+  tags:
+  - cpupower
+  - tuned
+  - common
+
+- name: verify CPU is compatible
+  shell: cpupower frequency-info
+  register: cpupower_info
+  changed_when: false
+  tags:
+  - cpupower
+  - tuned
+  - common
+
+- fail:
+    msg: "Can not determine CPU frequency-info."
+  when: "cpupower_info.stdout.find('Supported:') == -1"
+  tags:
+  - cpupower
+  - tuned
+  - common
+
+- name: be sure cpupower is running and enabled
+  service:
+    name: cpupower
+    state: started
+    enabled: yes
+  when: "cpupower_info.stdout.find('Supported: yes') != -1"
+  tags:
+  - cpupower
+  - tuned
+  - common
+
+- name: configure cpupower service
+  template:
+    src: cpupower.j2
+    dest: /etc/sysconfig/cpupower
+  notify: restart cpupower
+  when: "cpupower_info.stdout.find('Supported: yes') != -1"
+  tags:
+  - cpupower
+  - tuned
+  - common
+
+- name: be sure cpupower is stopped and disabled
+  service:
+    name: cpupower
+    state: stopped
+    enabled: no
+  when: "cpupower_info.stdout.find('Supported: no') != -1"
+  tags:
+  - cpupower
+  - tuned
+  - common

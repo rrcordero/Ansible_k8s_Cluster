@@ -1,0 +1,59 @@
+---
+
+- name: Scheduler Host
+  include_vars: host_scheduler.yml
+  when:
+  - ansible_virtualization_role | lower == 'host'
+  tags:
+  - scheduler
+  - common
+
+- name: Old scheduler KVM
+  include_vars: kvm_guest_scheduler_old.yml
+  when:
+  - ansible_distribution_version is version('7.5', '<')
+  - ansible_virtualization_type | lower == 'kvm'
+  - ansible_virtualization_role | lower == 'guest'
+  tags:
+  - scheduler
+  - common
+
+- name: New scheduler KVM
+  include_vars: kvm_guest_scheduler_new.yml
+  when:
+  - ansible_distribution_version is version('7.5', '>=')
+  - ansible_virtualization_type | lower == 'kvm'
+  - ansible_virtualization_role | lower == 'guest'
+  tags:
+  - scheduler
+  - common
+
+- name: Scheduler XEN
+  include_vars: xen_guest_scheduler.yml
+  when:
+  - ansible_distribution_version is version('7.5', '>=')
+  - ansible_virtualization_type | lower == 'xen'
+  - ansible_virtualization_role | lower == 'guest'
+  tags:
+  - scheduler
+  - common
+
+- name: change disk scheduler
+  shell: echo {{ common_disk_scheduler }} > /sys/block/{{ item.key }}/queue/scheduler
+  with_dict: "{{ ansible_devices }}"
+  when:
+  - (item.key | lower) is match("(xvd|vd|sd|hd)[a-z]")
+  - item.value.scheduler_mode | lower != common_disk_scheduler
+  tags:
+  - scheduler
+  - common
+
+- name: persist disk scheduler
+  lineinfile: dest=/etc/rc.local state=present regexp="^echo .* > /sys/block/{{ item.key }}/queue/scheduler" line="echo {{ common_disk_scheduler }} > /sys/block/{{ item.key }}/queue/scheduler" insertafter=EOF follow=yes mode=755
+  with_dict: "{{ ansible_devices }}"
+  when:
+  - (item.key | lower) is match("(xvd|vd|sd|hd)[a-z]")
+  - item.value.scheduler_mode | lower != common_disk_scheduler
+  tags:
+  - scheduler
+  - common

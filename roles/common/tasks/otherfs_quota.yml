@@ -1,0 +1,24 @@
+---
+
+- name: create quota files
+  shell: quotacheck -avugm
+  register: quotacheck
+  failed_when:
+  - "'quotacheck: Checked' not in quotacheck.stderr"
+  - "'Quota for users is enabled' not in quotacheck.stderr"
+  changed_when: false
+  tags:
+  - quotas
+  - common
+
+- name: enable quota
+  shell: quotaon -avug
+  register: quotaon
+  failed_when:
+  - "'user quotas turned on' not in quotaon.stdout"
+  - "'using //aquota.user on ' + ansible_cmdline.root + ' [/]: Device or resource busy' not in quotaon.stderr"
+  changed_when: false
+  tags:
+  - quotas
+  - common
+

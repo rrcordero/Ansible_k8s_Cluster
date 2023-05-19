@@ -1,0 +1,29 @@
+---
+
+- name: be sure tuned is installed
+  yum: name=tuned state=installed
+  tags:
+  - tuned
+  - common
+
+- name: ensure tuned is started and enabled
+  service: name=tuned state=started enabled=yes
+  tags:
+  - tuned
+  - common
+
+- name: register current active profile
+  shell: tuned-adm active
+  changed_when: false
+  register: tuned_adm_status
+  tags:
+  - tuned
+  - common
+
+- name: change active profile
+  shell: tuned-adm profile {{ tuned_profile }}
+  when: tuned_adm_status.stdout.find(tuned_profile) == -1
+  notify: reboot
+  tags:
+  - tuned
+  - common

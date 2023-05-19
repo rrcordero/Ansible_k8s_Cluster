@@ -1,0 +1,42 @@
+---
+
+- name: Verify logrotate version
+  command: rpm -qa | grep logrotate-3.8.6-12
+  register: logrotate_version
+  changed_when: false
+  args:
+    warn: no
+  tags:
+  - logrotate
+  - common
+
+- name: Verify if logrotate.status exists in previous location
+  stat: path=/var/lib/logrotate.status.rpmsave
+  register: logrotate_status
+  tags:
+  - logrotate
+  - common
+
+- name: Move logrotate.status
+  copy: remote_src=True src=/var/lib/logrotate.status.rpmsave dest=/var/lib/logrotate/logrotate.status
+  when:
+  - logrotate_version.stdout.find('logrotate-3.8.6-12') != -1
+  - logrotate_status.stat.exists
+  tags:
+  - logrotate
+  - common
+
+- name: Delete logrotate.status from previous location
+  file: path=/var/lib/logrotate.status.rpmsave state=absent
+  tags:
+  - logrotate
+  - common
+
+- name: Setup logrotate.d scripts
+  template:
+    src: logrotate.d.j2
+    dest: "{{ common_logrotate_conf_dir }}{{ item.name }}"
+  with_items: "{{ common_logrotate_scripts }}"
+  tags:
+  - logrotate
+  - common

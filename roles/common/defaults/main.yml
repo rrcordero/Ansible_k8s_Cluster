@@ -1,0 +1,53 @@
+---
+common_root_passalgo: sha512
+common_root_default_password: ""
+
+common_extra_tasks: "yes"
+common_sysconfig_clock: 'disabled'
+common_rc_local_service: 'enabled'
+common_vm_zone_reclaim_mode: 'disabled'
+common_time_sync_daemon: chrony
+common_raid_check: 'enabled'
+common_trim: 'disabled'
+
+ssh_password_authentication: "no"
+ssh_permit_root_login: "yes"
+ssh_password_authentication_subnet: 172.16.0.0/12
+
+common_quota_enabled: false
+common_mount_points_filesystem: xfs
+common_mount_points:
+  - name: /
+    src: "{{ ansible_cmdline.root }}"
+    opts: noatime,logbufs=8,logbsize=256k,delaylog
+    fstype: "{{ common_mount_points_filesystem }}"
+    passno: 1
+    dump: 1
+
+common_time_source_servers:
+  - 0.centos.pool.ntp.org
+  - 1.centos.pool.ntp.org
+  - 2.centos.pool.ntp.org
+  - 3.centos.pool.ntp.org
+
+tuned_profile: 'none'
+
+common_limits_nofile: 65535
+
+default_pkg_absent: []
+
+common_swap: true
+common_swap_lvm_mapper: /dev/mapper/VolGroup00-LogVol00
+common_swap_lvm_name: LogVol00
+common_swap_vg_name: VolGroup00
+
+common_swap_file: false
+common_swap_file_path: /swapfile
+common_swap_file_size_kb: 2048
+
+common_cloud_preserve_hostname: false
+
+common_logrotate_conf_dir: "/etc/logrotate.d/"
+common_logrotate_scripts: []
+
+grub_cmd_linux: []

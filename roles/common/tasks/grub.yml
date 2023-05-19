@@ -1,0 +1,28 @@
+---
+
+- name: Checking grub for existing parameter
+  lineinfile:
+    path: /etc/default/grub
+    regexp: "{{ item }}"
+    state: absent
+  with_items: '{{ grub_cmd_linux  }}'
+  check_mode: yes
+  register: exists_grub_parameter
+  tags:
+  - common
+  - grub_cmd
+
+- name: Modifying GRUB_CMD_LINUX
+  replace:
+    path: /etc/default/grub
+    regexp: '(GRUB_CMDLINE_LINUX=")(.*)("$)'
+    replace: '\1\2 {{ item }}\3'
+  with_items: '{{ grub_cmd_linux }}' 
+  notify: update grub2 config
+  when:
+  - exists_grub_parameter is not changed
+  - grub_cmd_linux is defined
+  - grub_cmd_linux | length > 0
+  tags:
+  - common
+  - grub_cmd 

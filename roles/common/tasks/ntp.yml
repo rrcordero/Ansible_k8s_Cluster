@@ -1,0 +1,26 @@
+---
+
+- name: be sure chrony is absent
+  yum: name=chrony state=absent
+  tags:
+  - common
+  - time
+
+- name: be sure ntp is installed
+  yum: name=ntp state=installed
+  tags:
+  - common
+  - time
+
+- name: configure ntp
+  template: src=ntp.conf.j2 dest=/etc/ntp.conf
+  notify: restart ntp
+  tags:
+  - common
+  - time
+
+- name: be sure ntpd is running and enabled
+  service: name=ntpd state=started enabled=yes
+  tags:
+  - common
+  - time

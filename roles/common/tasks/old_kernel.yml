@@ -1,0 +1,9 @@
+---
+
+- name: update the kernel
+  yum: name=kernel* state=latest
+  notify: reboot
+  tags:
+  - kernel
+  - upgrade
+  - common

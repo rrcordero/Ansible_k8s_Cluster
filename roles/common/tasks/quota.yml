@@ -1,0 +1,21 @@
+---
+
+- name: install quota
+  yum: name=quota state=present
+  tags:
+  - quotas
+  - common
+
+- name: configure xfs quota
+  include_tasks: xfs_quota.yml
+  when: common_mount_points_filesystem | lower == "xfs"
+  tags:
+  - quotas
+  - common
+
+- name: configure quota for other filesystems
+  include_tasks: otherfs_quota.yml
+  when: common_mount_points_filesystem | lower != "xfs"
+  tags:
+  - quotas
+  - common

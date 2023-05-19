@@ -1,0 +1,12 @@
+---
+
+default_pkg:
+  - wget
+  - nano
+  - openssh-clients
+  - screen
+  - sudo
+  - unzip
+  - xz
+  - vim
+  - htop

@@ -1,0 +1,26 @@
+---
+
+- name: be sure ntp is absent
+  yum: name=ntp state=absent
+  tags:
+  - time
+  - common
+
+- name: be sure chrony is installed
+  yum: name=chrony state=installed
+  tags:
+  - common
+  - time
+
+- name: configure chrony
+  template: src=chrony.conf.j2 dest=/etc/chrony.conf
+  notify: restart chrony
+  tags:
+  - common
+  - time
+
+- name: be sure chronyd is running and enabled
+  service: name=chronyd state=started enabled=yes
+  tags:
+  - common
+  - time

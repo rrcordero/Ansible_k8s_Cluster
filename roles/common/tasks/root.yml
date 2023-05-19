@@ -1,0 +1,48 @@
+---
+
+- name: Get all accounts with UID 0
+  shell: "awk -F: '$3 == 0 {print $1}' /etc/passwd"
+  changed_when: false
+  register: root_user_check
+  tags:
+  - common
+  - root
+
+- name: Print warnings for non-root users with UID 0
+  fail:
+    msg: |
+      Only the 'root' user should have UID 0. Other users were found:
+      {{ root_user_check.stdout_lines | join(', ') }}"
+  when:
+  - root_user_check.stdout != 'root'
+  tags:
+  - common
+  - root
+
+- name: Get root password hash
+  shell: "awk -F: '$1 == \"root\" {print $2}' /etc/shadow"
+  changed_when: false
+  register: root_user_hash
+  tags:
+  - common
+  - root
+
+- fail:
+    msg: "Default password is not set!"
+  when:
+  - common_root_default_password == ""
+  tags:
+  - common
+  - root
+
+- name: Set root random password
+  user:
+    name: root
+    password: "{{ lookup('password', '/dev/null') | password_hash(common_root_passalgo) }}"
+    update_password: always
+  when:
+  - root_user_hash.stdout == common_root_default_password
+  tags:
+  - common
+  - root
+

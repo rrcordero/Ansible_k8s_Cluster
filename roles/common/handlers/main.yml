@@ -1,0 +1,15 @@
+---
+- name: restart ssh
+  service: name=sshd state=restarted
+
+- name: restart ntp
+  service: name=ntpd state=restarted
+
+- name: restart chrony
+  service: name=chronyd state=restarted
+
+- name: restart rsyslog
+  service: name=rsyslog state=restarted
+
+- name: restart cpupower
+  service: name=cpupower state=restarted

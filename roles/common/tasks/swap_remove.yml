@@ -1,0 +1,40 @@
+---
+
+- name: ensure swap is off
+  shell: "swapoff -v {{ common_swap_lvm_mapper }}"
+  tags:
+  - swap
+  - swapping
+  - common
+
+- name: remove fstab entry
+  mount: name="{{ common_swap_lvm_mapper }}" state=absent
+  tags:
+  - swap
+  - swapping
+  - common
+
+- name: delete lvm
+  lvol:
+    vg: "{{ common_swap_vg_name }}"
+    lv: "{{ common_swap_lvm_name }}"
+    state: absent
+    force: yes
+  tags:
+  - swap
+  - swapping
+  - common
+
+- name: remove lvm from grub config
+  lineinfile:
+    dest: "/etc/default/grub"
+    backup: true
+    backrefs: true
+    state: present
+    regexp: '(^GRUB_CMDLINE_LINUX=\".*)( rd\.lvm\.lv={{ common_swap_vg_name }}/{{ common_swap_lvm_name }} )(.*\"$)'
+    line: '\1 \3'
+  notify: update grub2 config
+  tags:
+  - swap
+  - swapping
+  - common

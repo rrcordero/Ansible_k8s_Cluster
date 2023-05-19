@@ -1,0 +1,21 @@
+---
+
+- name: Install elrepo dependency
+  include_role:
+    name: elrepo_repo
+  tags:
+  - kernel
+  - upgrade
+  - common
+
+# Same version as CoreOS stable (kernel and docker)
+- name: Install newest kernel
+  yum:
+    name: kernel-lt
+    state: present
+    enablerepo: "elrepo,elrepo-kernel"
+  notify: change grub2 default
+  tags:
+  - kernel
+  - upgrade
+  - common

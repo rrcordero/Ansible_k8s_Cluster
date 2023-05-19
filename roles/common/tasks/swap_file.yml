@@ -1,0 +1,47 @@
+---
+
+- name: Create swap file
+  command: "dd if=/dev/zero of={{ common_swap_file_path }} bs=1024 count={{ common_swap_file_size_kb }}k"
+  tags:
+  - swap
+  - swapping
+  - common
+
+- name: Change swap file permissions
+  file:
+    path: "{{ common_swap_file_path }}"
+    owner: "root"
+    group: "root"
+    mode: "0600"
+  tags:
+  - swap
+  - swapping
+  - common
+
+- name: Make swap
+  command: "mkswap {{ common_swap_file_path }}"
+  tags:
+  - swap
+  - swapping
+  - common
+
+- name: Write swap entry in fstab
+  mount:
+    name: none
+    src: "{{ common_swap_file_path }}"
+    fstype: swap
+    opts: defaults
+    passno: 0
+    dump: 0
+    state: present
+  tags:
+  - swap
+  - swapping
+  - common
+
+- name: Mount swap
+  command: "swapon {{ common_swap_file_path }}"
+  tags:
+  - swap
+  - swapping
+  - common

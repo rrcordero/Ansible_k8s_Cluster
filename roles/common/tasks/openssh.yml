@@ -1,0 +1,27 @@
+---
+
+- name: be sure openssh-server is installed
+  yum:
+    name: openssh-server
+    state: present
+  tags:
+  - openssh-server
+  - common
+
+- name: be sure openssh-server is running and enabled
+  service:
+    name: sshd
+    state: started
+    enabled: yes
+  tags:
+  - openssh-server
+  - common
+
+- name: configure ssh server
+  template:
+    src: sshd_config.j2
+    dest: /etc/ssh/sshd_config
+  notify: restart ssh
+  tags:
+  - openssh-server
+  - common

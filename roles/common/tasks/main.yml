@@ -1,0 +1,294 @@
+---
+
+- include_tasks: trim.yml
+  when: common_trim | lower == 'enabled'
+  tags:
+  - trim
+  - common
+
+- name: set timezone
+  file: src=/usr/share/zoneinfo/{{ timezone }} dest=/etc/localtime state=link force=yes
+  tags:
+  - common
+  - time
+
+- name: ensure selected timezone is persistent (Centos <= 6)
+  lineinfile: dest=/etc/sysconfig/clock state=present regexp="^ZONE=" insertafter=EOF line="ZONE={{ timezone }}"
+  when: "common_sysconfig_clock | lower == 'enabled'"
+  tags:
+  - common
+  - time
+
+- include_tasks: ntp.yml
+  when: "common_time_sync_daemon | lower == 'ntp'"
+  tags:
+  - common
+  - time
+
+- include_tasks: chrony.yml
+  when: "common_time_sync_daemon | lower == 'chrony'"
+  tags:
+  - common
+  - time
+
+- include_tasks: openssh.yml
+  tags:
+  - openssh-server
+  - common
+
+- name: change hostname
+  hostname: name={{ hostname }}
+  tags:
+  - hostname
+  - hosts
+  - common
+
+- name: disable updating hostname in cloud-init
+  lineinfile:
+    dest: /etc/cloud/cloud.cfg
+    regexp: 'update_hostname$'
+    line: '# - update_hostname'
+    backup: yes
+  when: "common_cloud_preserve_hostname | bool == true"
+  tags:
+  - cloud
+  - hostname
+  - hosts
+  - common
+
+- name: Set up authorized_keys
+  authorized_key: user=root key="{{ ansible_key }}" manage_dir=yes
+  tags:
+  - common
+  - root
+
+- include_tasks: root.yml
+  tags:
+  - common
+  - root
+
+- name: avoid swapping as much as possible
+  sysctl: name="vm.swappiness" value=1 state=present reload=yes
+  tags:
+  - swapping
+  - common
+  - swap
+
+- name: disable vm zone reclaim
+  sysctl: name="vm.zone_reclaim_mode" value=0 state=present reload=yes
+  when: "common_vm_zone_reclaim_mode | lower == 'disabled'"
+  tags:
+  - swap
+  - swapping
+  - common
+
+- name: remove swap
+  include_tasks: swap_remove.yml
+  when:
+  - common_swap | bool == false
+  - ansible_swaptotal_mb != 0
+  tags:
+  - swap
+  - swapping
+  - common
+
+- name: create swap
+  include_tasks: swap_file.yml
+  when:
+  - common_swap_file | bool == true
+  - ansible_swaptotal_mb == 0
+  tags:
+  - swap
+  - swapping
+  - common
+
+- name: reset yum fastest mirror
+  file: name=/var/cache/yum/timedhosts.text state=absent
+  tags:
+  - yum
+  - common
+  - upgrade
+
+- name: install default packages
+  yum: name={{ default_pkg }} state=present
+  tags:
+  - yum
+  - common
+  - upgrade
+
+- name: remove certain packages
+  yum: name={{ default_pkg_absent }} state=absent
+  tags:
+  - yum
+  - common
+  - upgrade
+
+- name: configure mount points
+  mount: name={{ item.name }} src={{ item.src }} state={{ item.state | default('mounted') }} opts={{ item.opts }} fstype={{ item.fstype }} passno={{ item.passno }} dump={{ item.dump }}
+  with_items: "{{ common_mount_points }}"
+  tags:
+  - upgrade
+  - quotas
+  - common
+  - mounts
+  - kernel
+
+- name: set default yum configuration
+  template:
+    src: yum.conf.j2
+    dest: /etc/yum.conf
+  tags:
+  - kernel
+  - upgrade
+  - yum
+  - common
+
+- include_tasks: new_kernel.yml
+  when: "'CentOS_new_kernel_1' in group_names"
+  tags:
+  - kernel
+  - upgrade
+  - common
+
+- include_tasks: old_kernel.yml
+  when: "'CentOS_new_kernel_0' in group_names"
+  tags:
+  - kernel
+  - upgrade
+  - common
+
+
+- name: do a full system upgrade
+  yum:
+    name: "*"
+    exclude:
+      - kernel*
+      - epel-release
+      - php*
+      - nginx*
+      - mongo*
+      - zabbix*
+      - erlang*
+      - newrelic*
+      - etcd*
+      - Percona* 
+      - docker*
+      - flannel*
+      - redis*
+      - nodejs*
+      - npm*
+      - libuv*
+      - oci-*
+      - libbrotli*
+      - kmod-nvidia
+      - nvidia-x11-drv
+      - xorg-x11-server-Xorg
+      - rabbitmq-server
+      - jenkins*
+    state: latest
+    update_cache: yes
+  tags:
+  - upgrade
+  - common
+
+#- name: do a full system upgrade
+#  yum: name="*" state=latest update_cache=yes exclude=kernel*, epel-release, php*, nginx*, mongo*, zabbix*, erlang*, newrelic*, etcd*, Percona*, docker*, flannel*, redis*, nodejs*, npm*, libuv*, oci-*, libbrotli*, kmod-nvidia, nvidia-x11-drv, xorg-x11-server-Xorg, rabbitmq-server, jenkins*
+#  tags:
+#  - upgrade
+#  - common
+
+# Workaround for https://access.redhat.com/solutions/2756521
+- include_tasks: logrotate.yml
+  tags:
+  - logrotate
+  - upgrade
+  - common
+
+- include_tasks: extra.yml
+  when: common_extra_tasks|lower != 'no'
+  tags:
+  - extra
+  - common
+  - limits
+
+- name: install tuned
+  include_tasks: install_tuned.yml
+  when: "tuned_profile | lower != 'none'"
+  tags:
+  - tuned
+  - common
+
+- name: erase tuned
+  include_tasks: erase_tuned.yml
+  when: "tuned_profile | lower == 'none'"
+  tags:
+  - cpupower
+  - tuned
+  - common
+
+- name: setup quota dependencies
+  include_tasks: quota.yml
+  when: common_quota_enabled | bool == true
+  tags:
+  - quotas
+  - common
+
+- include_tasks: rsyslog.yml
+  tags:
+  - rsyslog
+  - common
+
+- meta: flush_handlers
+  tags:
+  - upgrade
+  - quotas
+  - swapping
+  - swap
+  - common
+
+- name: disable raid_check
+  template: src=raid-check.j2 dest=/etc/cron.d/raid-check
+  when: "common_raid_check | lower == 'disabled'"
+  tags:
+  - raid-check
+  - common
+
+- action: setup
+  tags:
+  - trim
+  - kernel
+  - extra
+  - logrotate
+  - rsyslog
+  - cloud
+  - upgrade
+  - hostname
+  - swap
+  - hosts
+  - openssh-server
+  - quotas
+  - scheduler
+  - cpupower
+  - swapping
+  - raid-check
+  - tuned
+  - yum
+  - common
+  - time
+  - mounts
+  - root
+
+# Depends on kernel upgrade
+- include_tasks: scheduler.yml
+  when: "tuned_profile | lower == 'none'"
+  tags:
+  - scheduler
+  - common
+
+- include_tasks: grub.yml
+  when:
+  - grub_cmd_linux is defined
+  - grub_cmd_linux | length > 0
+  tags:
+  - common
+  - grub_cmd 

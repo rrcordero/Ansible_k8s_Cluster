@@ -1,0 +1,52 @@
+---
+
+- name: Check that the lvm.conf exists
+  stat:
+    path: "/etc/lvm/lvm.conf"
+  register: stat_result
+  tags:
+  - trim
+  - common
+
+# TODO: remove when deployed
+- name: Delete failed lines
+  lineinfile:
+    dest: "/etc/lvm/lvm.conf"
+    state: absent
+    regexp: '^issue_discards = 1'
+  when: stat_result.stat.exists == True
+  tags:
+  - trim
+  - common
+
+- name: Enable TRIM in LVM
+  lineinfile:
+    dest: "/etc/lvm/lvm.conf"
+    state: present
+    backrefs: yes
+    regexp: '(.*)issue_discards = 0'
+    line: '\1issue_discards = 1'
+  when: stat_result.stat.exists == True
+  tags:
+  - trim
+  - common
+
+- name: Ensure TRIM service is started and enabled on boot
+  systemd:
+    name: 'fstrim.timer'
+    state: started
+    enabled: yes
+  when: systemctl | lower == 'enabled'
+  tags:
+  - trim
+  - common
+
+- name: Create TRIM cron
+  template:
+    src: dofstrim.j2
+    dest: /etc/cron.weekly/dofstrim
+    mode: 'u+x'
+  when: systemctl | lower == 'disabled'
+  tags:
+  - trim
+  - common
